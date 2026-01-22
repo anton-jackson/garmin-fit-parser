@@ -2,6 +2,15 @@
 
 A desktop macOS application that allows users to import Garmin .FIT files, inspect available data fields, select desired fields for export, and save the data as a CSV file.
 
+## Download
+
+Download the latest release from the [Releases](https://github.com/YOUR_USERNAME/FIT_extractor/releases) page.
+
+**Note**: On first launch, macOS may show a security warning because the app is not code-signed. To open it:
+1. Right-click the app
+2. Select "Open"
+3. Click "Open" in the security dialog
+
 ## Features
 
 - **Import FIT Files**: Native macOS file picker for selecting Garmin FIT files
@@ -31,7 +40,7 @@ A desktop macOS application that allows users to import Garmin .FIT files, inspe
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/YOUR_USERNAME/FIT_extractor.git
 cd FIT_extractor
 ```
 
@@ -55,19 +64,25 @@ This will:
 
 ### Building
 
-Build the application for production:
+Build the React application for production:
 
 ```bash
 npm run build
 ```
 
-Create a distributable DMG package:
+Create a distributable macOS DMG package:
 
 ```bash
 npm run electron:build
 ```
 
-The DMG file will be created in the `dist` folder.
+**Build Output:**
+- **DMG Installer**: `dist/FIT File Data Exporter-1.0.0-arm64.dmg` - Double-click to install
+- **App Bundle**: `dist/mac-arm64/FIT File Data Exporter.app` - The actual application
+
+The DMG file can be distributed to users. When opened, it will show the app with a link to drag to the Applications folder.
+
+**Note**: The app is not code-signed by default. For distribution outside the Mac App Store, you'll need to sign it with a Developer ID certificate.
 
 ## Project Structure
 

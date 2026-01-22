@@ -27,3 +27,15 @@ dist-electron
 out
 build/*.icns
 build/*.ico
+
+# Build artifacts (should be distributed via GitHub Releases, not committed)
+*.dmg
+*.app
+dist/mac-*
+dist/FIT*.dmg
+dist/FIT*.dmg.blockmap
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
