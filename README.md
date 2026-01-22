@@ -125,3 +125,4 @@ fit-exporter/
 ## License
 
 MIT
+# garmin-fit-parser
