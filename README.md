@@ -4,7 +4,7 @@ A desktop macOS application that allows users to import Garmin .FIT files, inspe
 
 ## Download
 
-Download the latest release from the [Releases](https://github.com/YOUR_USERNAME/FIT_extractor/releases) page.
+Download the latest release from the [Releases](https://github.com/anton-jackson/garmin-fit-parser/releases) page.
 
 **Note**: On first launch, macOS may show a security warning because the app is not code-signed. To open it:
 1. Right-click the app
@@ -40,8 +40,8 @@ Download the latest release from the [Releases](https://github.com/YOUR_USERNAME
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/YOUR_USERNAME/FIT_extractor.git
-cd FIT_extractor
+git clone https://github.com/anton-jackson/garmin-fit-parser.git
+cd garmin-fit-parser
 ```
 
 2. Install dependencies:
