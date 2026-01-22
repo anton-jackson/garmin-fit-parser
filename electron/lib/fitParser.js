@@ -26,8 +26,8 @@ export async function parseFITFile(fileBuffer) {
         return;
       }
 
-      if (!data || !data.records) {
-        reject(new Error('Invalid FIT file: No records found'));
+      if (!data) {
+        reject(new Error('Invalid FIT file: No data found'));
         return;
       }
 
@@ -48,15 +48,44 @@ export async function parseFITFile(fileBuffer) {
         });
       });
 
+      // Extract lap data if available
+      const laps = data.laps || [];
+      let lapFields = [];
+      if (laps.length > 0) {
+        const lapFieldMap = new Map();
+        laps.forEach((lap, index) => {
+          Object.keys(lap).forEach(fieldName => {
+            if (!lapFieldMap.has(fieldName)) {
+              lapFieldMap.set(fieldName, {
+                name: `lap_${fieldName}`, // Prefix with 'lap_' to distinguish from record fields
+                type: typeof lap[fieldName],
+                sampleValue: lap[fieldName],
+                firstIndex: index
+              });
+            }
+          });
+        });
+        lapFields = Array.from(lapFieldMap.values()).sort((a, b) => 
+          a.name.localeCompare(b.name)
+        );
+      }
+
       // Convert map to array and sort by field name
       const availableFields = Array.from(fieldMap.values()).sort((a, b) => 
         a.name.localeCompare(b.name)
       );
 
+      // Combine record and lap fields
+      const allFields = [...availableFields, ...lapFields];
+
       resolve({
         records: records,
-        availableFields: availableFields,
-        recordCount: records.length
+        laps: laps,
+        availableFields: allFields,
+        recordCount: records.length,
+        lapCount: laps.length,
+        sessions: data.sessions || [],
+        activity: data.activity || null
       });
     });
   });

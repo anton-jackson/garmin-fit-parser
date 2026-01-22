@@ -5,7 +5,8 @@ A desktop macOS application that allows users to import Garmin .FIT files, inspe
 ## Features
 
 - **Import FIT Files**: Native macOS file picker for selecting Garmin FIT files
-- **Field Discovery**: Automatically parses and displays all available data fields
+- **Field Discovery**: Automatically parses and displays all available data fields from records, laps, sessions, and activity data
+- **Lap Data Support**: Extracts and displays lap summary data (prefixed with `lap_`) when available in FIT files
 - **Field Selection**: Select/deselect individual fields or use Select All/Clear All
 - **CSV Export**: Export selected fields to CSV with customizable save location
 - **Modern UI**: Clean, responsive interface built with React and Tailwind CSS
@@ -93,6 +94,9 @@ fit-exporter/
 
 1. **Import a FIT File**: Click "Select FIT File" and choose a Garmin FIT file
 2. **Review Fields**: All available data fields will be displayed with their types and sample values
+   - Record fields: Time-series data points (e.g., `timestamp`, `heart_rate`, `power`, `cadence`)
+   - Lap fields: Lap summary data (prefixed with `lap_`, e.g., `lap_total_elapsed_time`, `lap_avg_heart_rate`)
+   - Session and activity data are also extracted when available
 3. **Select Fields**: Check the boxes next to fields you want to export, or use "Select All"
 4. **Export**: Click "Export to CSV" and choose where to save the file
 
