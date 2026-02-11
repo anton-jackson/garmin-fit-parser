@@ -1,24 +1,28 @@
-# Example GitHub Actions workflow for building releases
-# Uncomment and configure if you want automated builds on tags
+# Build and release workflow - runs only when you push a version tag (e.g. v1.0.0)
+name: Build and Release
 
-# name: Build and Release
-# 
-# on:
-#   push:
-#     tags:
-#       - 'v*'
-# 
-# jobs:
-#   build:
-#     runs-on: macos-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#       - uses: actions/setup-node@v3
-#         with:
-#           node-version: '18'
-#       - run: npm ci
-#       - run: npm run electron:build
-#       - uses: actions/upload-artifact@v3
-#         with:
-#           name: DMG
-#           path: dist/*.dmg
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run electron:build
+        env:
+          NODE_ENV: production
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: dist/*.dmg
