@@ -25,6 +25,7 @@ function App() {
   const [selectedFields, setSelectedFields] = useState(new Set());
   const [status, setStatus] = useState({ message: '', type: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const electronAPI = useElectronAPI();
 
@@ -127,9 +128,57 @@ function App() {
     }
   }, [selectedFields, parsedData, selectedFile, electronAPI]);
 
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!isDraggingOver) setIsDraggingOver(true);
+  }, [isDraggingOver]);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDraggingOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    const files = e.dataTransfer?.files;
+    if (!files?.length) return;
+    const file = files[0];
+    const path = file.path;
+    if (!path) return;
+    const lower = (file.name || path).toLowerCase();
+    if (!lower.endsWith('.fit')) {
+      setStatus({ message: 'Please drop a .FIT file', type: 'error' });
+      return;
+    }
+    handleFileSelected(path);
+  }, [handleFileSelected]);
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div
+      className="flex flex-col h-screen bg-gray-50 relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <Header />
+      {isDraggingOver && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg m-2 pointer-events-none"
+          aria-hidden
+        >
+          <div className="bg-white/95 rounded-xl shadow-lg px-8 py-6 text-center">
+            <p className="text-lg font-medium text-gray-800">Drop FIT file here</p>
+            <p className="text-sm text-gray-500 mt-1">Release to load the file</p>
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <FileImport 
           onFileSelected={handleFileSelected}

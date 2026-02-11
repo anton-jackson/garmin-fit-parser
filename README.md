@@ -109,9 +109,11 @@ fit-exporter/
 
 1. **Import a FIT File**: Click "Select FIT File" and choose a Garmin FIT file
 2. **Review Fields**: All available data fields will be displayed with their types and sample values
-   - Record fields: Time-series data points (e.g., `timestamp`, `heart_rate`, `power`, `cadence`)
-   - Lap fields: Lap summary data (prefixed with `lap_`, e.g., `lap_total_elapsed_time`, `lap_avg_heart_rate`)
-   - Session and activity data are also extracted when available
+   - Record fields: Time-series data points (e.g., `timestamp`, `heart_rate`, `power`, `cadence`, `distance`)
+   - Lap fields: Lap summary (prefixed with `lap_`, e.g., `lap_total_distance`, `lap_avg_heart_rate`)
+   - Session fields: Session summary (prefixed with `session_`, e.g., `session_total_distance`)
+   - Activity fields: Overall activity summary (prefixed with `activity_`)
+   - **Distance**: Per-point distance is in the record field `distance`; lap/session totals appear as `lap_total_distance` or `session_total_distance`.
 3. **Select Fields**: Check the boxes next to fields you want to export, or use "Select All"
 4. **Export**: Click "Export to CSV" and choose where to save the file
 

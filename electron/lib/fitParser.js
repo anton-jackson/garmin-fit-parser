@@ -70,13 +70,55 @@ export async function parseFITFile(fileBuffer) {
         );
       }
 
+      // Extract session fields (often includes total_distance, total_elapsed_time, etc.)
+      const sessions = data.sessions || [];
+      let sessionFields = [];
+      if (sessions.length > 0) {
+        const sessionFieldMap = new Map();
+        sessions.forEach((session, index) => {
+          Object.keys(session).forEach(fieldName => {
+            if (!sessionFieldMap.has(fieldName)) {
+              sessionFieldMap.set(fieldName, {
+                name: `session_${fieldName}`,
+                type: typeof session[fieldName],
+                sampleValue: session[fieldName],
+                firstIndex: index
+              });
+            }
+          });
+        });
+        sessionFields = Array.from(sessionFieldMap.values()).sort((a, b) => 
+          a.name.localeCompare(b.name)
+        );
+      }
+
+      // Extract activity fields (overall summary - activity is an object with nested data)
+      const activity = data.activity || {};
+      let activityFields = [];
+      if (typeof activity === 'object' && !Array.isArray(activity) && Object.keys(activity).length > 0) {
+        const activityFieldMap = new Map();
+        Object.keys(activity).forEach(fieldName => {
+          const val = activity[fieldName];
+          if (val === null || val === undefined || typeof val === 'object') return; // skip nested objects
+          activityFieldMap.set(fieldName, {
+            name: `activity_${fieldName}`,
+            type: typeof val,
+            sampleValue: val,
+            firstIndex: 0
+          });
+        });
+        activityFields = Array.from(activityFieldMap.values()).sort((a, b) => 
+          a.name.localeCompare(b.name)
+        );
+      }
+
       // Convert map to array and sort by field name
       const availableFields = Array.from(fieldMap.values()).sort((a, b) => 
         a.name.localeCompare(b.name)
       );
 
-      // Combine record and lap fields
-      const allFields = [...availableFields, ...lapFields];
+      // Combine record, lap, session, and activity fields
+      const allFields = [...availableFields, ...lapFields, ...sessionFields, ...activityFields];
 
       resolve({
         records: records,

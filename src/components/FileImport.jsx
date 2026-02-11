@@ -39,7 +39,7 @@ function FileImport({ onFileSelected, selectedFile, isLoading }) {
             <FileInfo filePath={selectedFile} />
           ) : (
             <p className="text-sm text-gray-500">
-              Select a Garmin FIT file to begin
+              Select a Garmin FIT file to begin, or drag and drop a .FIT file anywhere on the window
             </p>
           )}
         </div>

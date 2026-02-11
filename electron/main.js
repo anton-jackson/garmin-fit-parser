@@ -76,8 +76,10 @@ async function createWindow() {
   });
 
   // Load the app
-  // Default to development mode unless explicitly set to production
-  const isDevelopment = process.env.NODE_ENV !== 'production';
+  // Use production build when packaged (.app) or when NODE_ENV=production
+  const isPackaged = app.isPackaged;
+  const isDevelopment = !isPackaged && process.env.NODE_ENV !== 'production';
+  console.log('isPackaged:', isPackaged);
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('isDevelopment:', isDevelopment);
   
