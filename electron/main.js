@@ -6,6 +6,7 @@ import { existsSync } from 'fs';
 import { createConnection } from 'net';
 import { parseFITFile } from './lib/fitParser.js';
 import { exportToCSV } from './lib/csvExporter.js';
+import { writeBundle } from './lib/exporters/bundle.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -193,5 +194,25 @@ ipcMain.handle('export-csv', async (event, records, selectedFields, suggestedNam
       success: false,
       error: error.message
     };
+  }
+});
+
+// Handle bundle export (markdown / json / csv to chosen base path)
+ipcMain.handle('export-bundle', async (event, analysis, options, suggestedName) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: suggestedName || 'activity',
+      filters: [{ name: 'Export', extensions: ['md', 'json', 'csv', '*'] }],
+      properties: ['showOverwriteConfirmation']
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    const written = await writeBundle(analysis, result.filePath, options);
+    return { success: true, written };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 });

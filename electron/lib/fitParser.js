@@ -1,134 +1,92 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const fitFileParserModule = require('fit-file-parser');
-// fit-file-parser exports the constructor as .default
-const FitParser = fitFileParserModule.default;
+import { analyzeFITFile } from './fitAnalyzer/index.js';
 
 /**
- * Parse a FIT file buffer and extract all available data fields
- * @param {Buffer} fileBuffer - The FIT file as a buffer
- * @returns {Promise<Object>} Parsed data with records and field information
+ * Parse a FIT file buffer.
+ *
+ * Returns the legacy shape (records / laps / availableFields / sessions /
+ * activity / counts) that the existing renderer consumes, plus a new
+ * `analysis` object with the structured + derived + binned data:
+ *   analysis: { activity, session, sessions, laps[], records[], lapSeries[] }
+ *
+ * Records and laps in `analysis` are enriched with derived metrics; the
+ * top-level `records` / `laps` mirror those enriched arrays so existing CSV
+ * export continues to work unchanged.
  */
 export async function parseFITFile(fileBuffer) {
-  return new Promise((resolve, reject) => {
-    const fitParser = new FitParser({
-      force: true,
-      speedUnit: 'ms',
-      lengthUnit: 'm',
-      temperatureUnit: 'celsius',
-      elapsedRecordField: true,
-      mode: 'list'
-    });
+  const analysis = await analyzeFITFile(fileBuffer);
 
-    fitParser.parse(fileBuffer, (error, data) => {
-      if (error) {
-        reject(new Error(`Failed to parse FIT file: ${error.message}`));
-        return;
-      }
-
-      if (!data) {
-        reject(new Error('Invalid FIT file: No data found'));
-        return;
-      }
-
-      // Extract all unique fields from records
-      const fieldMap = new Map();
-      const records = data.records || [];
-
-      records.forEach((record, index) => {
-        Object.keys(record).forEach(fieldName => {
-          if (!fieldMap.has(fieldName)) {
-            fieldMap.set(fieldName, {
-              name: fieldName,
-              type: typeof record[fieldName],
-              sampleValue: record[fieldName],
-              firstIndex: index
-            });
-          }
+  // Legacy field discovery — collect every key seen across records/laps/session/activity.
+  const recordFieldMap = new Map();
+  analysis.records.forEach((record, index) => {
+    Object.keys(record).forEach((name) => {
+      if (!recordFieldMap.has(name)) {
+        recordFieldMap.set(name, {
+          name,
+          type: typeof record[name],
+          sampleValue: record[name],
+          firstIndex: index
         });
-      });
-
-      // Extract lap data if available
-      const laps = data.laps || [];
-      let lapFields = [];
-      if (laps.length > 0) {
-        const lapFieldMap = new Map();
-        laps.forEach((lap, index) => {
-          Object.keys(lap).forEach(fieldName => {
-            if (!lapFieldMap.has(fieldName)) {
-              lapFieldMap.set(fieldName, {
-                name: `lap_${fieldName}`, // Prefix with 'lap_' to distinguish from record fields
-                type: typeof lap[fieldName],
-                sampleValue: lap[fieldName],
-                firstIndex: index
-              });
-            }
-          });
-        });
-        lapFields = Array.from(lapFieldMap.values()).sort((a, b) => 
-          a.name.localeCompare(b.name)
-        );
       }
-
-      // Extract session fields (often includes total_distance, total_elapsed_time, etc.)
-      const sessions = data.sessions || [];
-      let sessionFields = [];
-      if (sessions.length > 0) {
-        const sessionFieldMap = new Map();
-        sessions.forEach((session, index) => {
-          Object.keys(session).forEach(fieldName => {
-            if (!sessionFieldMap.has(fieldName)) {
-              sessionFieldMap.set(fieldName, {
-                name: `session_${fieldName}`,
-                type: typeof session[fieldName],
-                sampleValue: session[fieldName],
-                firstIndex: index
-              });
-            }
-          });
-        });
-        sessionFields = Array.from(sessionFieldMap.values()).sort((a, b) => 
-          a.name.localeCompare(b.name)
-        );
-      }
-
-      // Extract activity fields (overall summary - activity is an object with nested data)
-      const activity = data.activity || {};
-      let activityFields = [];
-      if (typeof activity === 'object' && !Array.isArray(activity) && Object.keys(activity).length > 0) {
-        const activityFieldMap = new Map();
-        Object.keys(activity).forEach(fieldName => {
-          const val = activity[fieldName];
-          if (val === null || val === undefined || typeof val === 'object') return; // skip nested objects
-          activityFieldMap.set(fieldName, {
-            name: `activity_${fieldName}`,
-            type: typeof val,
-            sampleValue: val,
-            firstIndex: 0
-          });
-        });
-        activityFields = Array.from(activityFieldMap.values()).sort((a, b) => 
-          a.name.localeCompare(b.name)
-        );
-      }
-
-      // Convert map to array and sort by field name
-      const availableFields = Array.from(fieldMap.values()).sort((a, b) => 
-        a.name.localeCompare(b.name)
-      );
-
-      // Combine record, lap, session, and activity fields
-      const allFields = [...availableFields, ...lapFields, ...sessionFields, ...activityFields];
-
-      resolve({
-        records: records,
-        laps: laps,
-        availableFields: allFields,
-        recordCount: records.length,
-        lapCount: laps.length,
-        sessions: data.sessions || [],
-        activity: data.activity || null
-      });
     });
   });
+
+  const lapFieldMap = new Map();
+  analysis.laps.forEach((lap, index) => {
+    Object.keys(lap).forEach((name) => {
+      const prefixed = `lap_${name}`;
+      if (!lapFieldMap.has(prefixed)) {
+        lapFieldMap.set(prefixed, {
+          name: prefixed,
+          type: typeof lap[name],
+          sampleValue: lap[name],
+          firstIndex: index
+        });
+      }
+    });
+  });
+
+  const sessionFieldMap = new Map();
+  if (analysis.session) {
+    Object.keys(analysis.session).forEach((name) => {
+      const val = analysis.session[name];
+      if (val == null || typeof val === 'object') return;
+      sessionFieldMap.set(`session_${name}`, {
+        name: `session_${name}`,
+        type: typeof val,
+        sampleValue: val,
+        firstIndex: 0
+      });
+    });
+  }
+
+  const activityFieldMap = new Map();
+  if (analysis.activity && typeof analysis.activity === 'object') {
+    Object.keys(analysis.activity).forEach((name) => {
+      const val = analysis.activity[name];
+      if (val == null || typeof val === 'object') return;
+      activityFieldMap.set(`activity_${name}`, {
+        name: `activity_${name}`,
+        type: typeof val,
+        sampleValue: val,
+        firstIndex: 0
+      });
+    });
+  }
+
+  const sortByName = (a, b) => a.name.localeCompare(b.name);
+  const recordFields = Array.from(recordFieldMap.values()).sort(sortByName);
+  const lapFields = Array.from(lapFieldMap.values()).sort(sortByName);
+  const sessionFields = Array.from(sessionFieldMap.values()).sort(sortByName);
+  const activityFields = Array.from(activityFieldMap.values()).sort(sortByName);
+
+  return {
+    records: analysis.records,
+    laps: analysis.laps,
+    sessions: analysis.sessions,
+    activity: analysis.activity,
+    recordCount: analysis.records.length,
+    lapCount: analysis.laps.length,
+    availableFields: [...recordFields, ...lapFields, ...sessionFields, ...activityFields],
+    analysis
+  };
 }

@@ -26,9 +26,17 @@ export function useElectronAPI() {
     return await window.electronAPI.exportCSV(records, selectedFields, suggestedName);
   }, []);
 
+  const exportBundle = useCallback(async (analysis, options, suggestedName) => {
+    if (!window.electronAPI) {
+      throw new Error('Electron API not available');
+    }
+    return await window.electronAPI.exportBundle(analysis, options, suggestedName);
+  }, []);
+
   return {
     selectFile,
     parseFile,
-    exportCSV
+    exportCSV,
+    exportBundle
   };
 }
