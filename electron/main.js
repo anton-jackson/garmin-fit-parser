@@ -31,7 +31,7 @@ function isPortOpen(port) {
 // Find the Vite dev server port
 async function findVitePort() {
   // Try common Vite ports
-  const ports = [5173, 5174, 5175, 5176, 5177];
+  const ports = [5180, 5173, 5174, 5175, 5176, 5177];
   for (const port of ports) {
     if (await isPortOpen(port)) {
       console.log(`Found Vite server on port ${port}`);
