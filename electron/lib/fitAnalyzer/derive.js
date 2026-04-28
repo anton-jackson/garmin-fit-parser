@@ -11,11 +11,18 @@ function minettiCost(g) {
   return 155.4 * g5 - 30.4 * g4 - 43.3 * g3 + 46.3 * g2 + 19.5 * g + 3.6;
 }
 
+// Minetti's cost curve was calibrated within roughly ±25% grade. Beyond that
+// the polynomial extrapolates and produces implausibly fast equivalents
+// (e.g. faster-than-world-record GAP for 30%+ climbs). Skip the conversion
+// outside the calibrated range.
+const MINETTI_GRADE_LIMIT = 0.25;
+
 // Grade-adjusted pace: equivalent flat pace (s/km) for the same metabolic cost.
 // gap = pace * (cost_flat / cost_grade)
 export function gradeAdjustPace(paceSPerKm, gradeDecimal) {
   if (paceSPerKm == null || !Number.isFinite(paceSPerKm)) return null;
   if (gradeDecimal == null || !Number.isFinite(gradeDecimal)) return paceSPerKm;
+  if (Math.abs(gradeDecimal) > MINETTI_GRADE_LIMIT) return null;
   const c = minettiCost(gradeDecimal);
   if (c <= 0) return null;
   return paceSPerKm * (MINETTI_FLAT_COST / c);
@@ -112,9 +119,18 @@ function sumNegative(deltas) {
   return s;
 }
 
+// Minimum substance for a lap to merit derived per-record analysis (drift /
+// decoupling). Tiny "press-then-stand" laps (e.g. 0.02 km, 1:04) produce
+// junk metrics that mislead a downstream coach agent.
+const LAP_MIN_DISTANCE_M = 100;
+const LAP_MIN_RECORDS = 30;
+
 function deriveLapMetrics(lap, lapRecords) {
   const distM = lap.total_distance ?? null;
   const elapsedSec = lap.total_elapsed_time ?? lap.total_timer_time ?? null;
+  const lapTooShort =
+    (distM != null && distM < LAP_MIN_DISTANCE_M) ||
+    lapRecords.length < LAP_MIN_RECORDS;
 
   const avgSpeed =
     lap.avg_speed ??
@@ -148,7 +164,7 @@ function deriveLapMetrics(lap, lapRecords) {
   let efFirst = null;
   let efSecond = null;
 
-  if (lapRecords.length >= 4) {
+  if (!lapTooShort && lapRecords.length >= 4) {
     const mid = Math.floor(lapRecords.length / 2);
     const first = lapRecords.slice(0, mid);
     const second = lapRecords.slice(mid);
@@ -177,7 +193,8 @@ function deriveLapMetrics(lap, lapRecords) {
     hr_drift_pct: hrDriftPct,
     pa_hr_decoupling_pct: paHrDecouplingPct,
     efficiency_factor_first_half: efFirst,
-    efficiency_factor_second_half: efSecond
+    efficiency_factor_second_half: efSecond,
+    too_short_for_derived: lapTooShort
   };
 }
 

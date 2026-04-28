@@ -66,8 +66,9 @@ export function formatElevation(meters, units) {
 export function formatPace(sPerKm, units) {
   const sPerUnit = paceSPerUnit(sPerKm, units);
   if (sPerUnit == null || sPerUnit <= 0) return '';
-  const m = Math.floor(sPerUnit / 60);
-  const s = Math.round(sPerUnit % 60);
+  let m = Math.floor(sPerUnit / 60);
+  let s = Math.round(sPerUnit % 60);
+  if (s === 60) { s = 0; m += 1; }
   return `${m}:${String(s).padStart(2, '0')}${paceLabel(units)}`;
 }
 export function formatVertPerDistance(verticalPerKmM, units) {

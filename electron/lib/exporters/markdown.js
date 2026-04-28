@@ -49,10 +49,10 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
   const lapsToShow = laps.filter((l) => selectedLapIndices.has(l.lap_index));
 
   const lapTable = [
-    `| # | Time | Dist (${distUnit}) | Pace | Avg HR | Max HR | Vert↑ (${elevUnit}) | Vert↓ (${elevUnit}) | Grade | HR drift | Pa:HR drift |`,
-    '|---|------|------|------|--------|--------|-------|-------|-------|----------|-------------|',
+    `| # | Type | Time | Dist (${distUnit}) | Pace | Avg HR | Max HR | Vert↑ (${elevUnit}) | Vert↓ (${elevUnit}) | Grade | HR drift | Pa:HR drift |`,
+    '|---|------|------|------|------|--------|--------|-------|-------|-------|----------|-------------|',
     ...lapsToShow.map((l) =>
-      `| ${l.lap_index + 1} | ${lapTimeStr(l)} | ${formatDistance(l.total_distance, units)} | ${formatPace(l.avg_pace_s_per_km, units)} | ${int(l.avg_heart_rate)} | ${int(l.max_heart_rate)} | ${formatElevation(l.total_ascent_m, units)} | ${formatElevation(l.total_descent_m, units)} | ${num(l.avg_grade_pct, 1)}% | ${num(l.hr_drift_pct, 1)}% | ${num(l.pa_hr_decoupling_pct, 1)}% |`
+      `| ${l.lap_index + 1} | ${l.intensity ?? 'active'} | ${lapTimeStr(l)} | ${formatDistance(l.total_distance, units)} | ${formatPace(l.avg_pace_s_per_km, units)} | ${int(l.avg_heart_rate)} | ${int(l.max_heart_rate)} | ${formatElevation(l.total_ascent_m, units)} | ${formatElevation(l.total_descent_m, units)} | ${num(l.avg_grade_pct, 1)}% | ${num(l.hr_drift_pct, 1)}% | ${num(l.pa_hr_decoupling_pct, 1)}% |`
     )
   ].join('\n');
 
@@ -60,13 +60,19 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
     const series = lapSeriesByIndex.get(l.lap_index);
     const binSize = series?.bin_size;
     const binUnit = series?.bin_unit;
+    const intensityLine = `**Type:** ${l.intensity ?? 'active'}` +
+      (l.lap_trigger ? ` (${l.lap_trigger})` : '');
+    const driftLine = l.too_short_for_derived
+      ? '_HR drift / Pa:HR decoupling skipped — lap too short for reliable derivation._'
+      : `**HR drift:** ${num(l.hr_drift_pct, 1)}% · **Pa:HR decoupling:** ${num(l.pa_hr_decoupling_pct, 1)}%`;
     const headerBits = [
+      intensityLine,
       `**Lap time:** ${lapTimeStr(l)}`,
       `**Distance:** ${formatDistance(l.total_distance, units)} ${distUnit}`,
       `**Avg HR:** ${int(l.avg_heart_rate)} (max ${int(l.max_heart_rate)})`,
       `**Avg pace:** ${formatPace(l.avg_pace_s_per_km, units)}`,
       `**Vert:** ↑${formatElevation(l.total_ascent_m, units)} ↓${formatElevation(l.total_descent_m, units)} ${elevUnit} (${num(l.avg_grade_pct, 1)}%)`,
-      `**HR drift:** ${num(l.hr_drift_pct, 1)}% · **Pa:HR decoupling:** ${num(l.pa_hr_decoupling_pct, 1)}%`
+      driftLine
     ].join('  \n');
 
     if (!series || series.series.length === 0) {

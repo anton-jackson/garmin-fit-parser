@@ -10,6 +10,9 @@ export function buildJSON(analysis, { selectedLapIndices, includeRecords = false
     .filter((l) => selectedLapIndices.has(l.lap_index))
     .map((l) => ({
       lap_index: l.lap_index,
+      intensity: l.intensity ?? 'active',
+      lap_trigger: l.lap_trigger ?? null,
+      too_short_for_derived: l.too_short_for_derived ?? false,
       start_time: l.start_time,
       total_elapsed_time: l.total_elapsed_time ?? l.total_timer_time ?? null,
       total_distance: l.total_distance ?? null,
