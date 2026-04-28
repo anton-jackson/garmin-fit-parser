@@ -199,6 +199,11 @@ function deriveLapMetrics(lap, lapRecords) {
   const totalCount = lapRecords.length;
   const movingPct = totalCount > 0 ? (movingCount / totalCount) * 100 : null;
 
+  // Prefer FIT's auto-paused timer time when present; else use moving record
+  // count as a 1 Hz approximation of moving seconds.
+  const movingS = lap.total_timer_time ?? (movingCount > 0 ? movingCount : null);
+  const vamMPerH = movingS && ascent != null ? ascent / (movingS / 3600) : null;
+
   return {
     avg_pace_s_per_km: avgPace,
     total_ascent_m: ascent,
@@ -210,7 +215,9 @@ function deriveLapMetrics(lap, lapRecords) {
     efficiency_factor_first_half: efFirst,
     efficiency_factor_second_half: efSecond,
     too_short_for_derived: lapTooShort,
-    moving_pct: movingPct
+    moving_pct: movingPct,
+    moving_s: movingS,
+    vam_m_per_h: vamMPerH
   };
 }
 
@@ -253,6 +260,9 @@ export function annotateSession(session, laps, records) {
   const movingRecs = records.filter((r) => r.is_moving).length;
   const gpsRecs = records.filter((r) => r.position_lat != null && r.position_long != null).length;
 
+  const movingS = session.total_timer_time ?? (movingRecs > 0 ? movingRecs : null);
+  const vamMPerH = movingS && ascent != null ? ascent / (movingS / 3600) : null;
+
   return {
     ...session,
     avg_pace_s_per_km: avgPace,
@@ -262,6 +272,8 @@ export function annotateSession(session, laps, records) {
     record_count: totalRecs,
     lap_count: laps.length,
     moving_pct: totalRecs > 0 ? (movingRecs / totalRecs) * 100 : null,
-    gps_pct: totalRecs > 0 ? (gpsRecs / totalRecs) * 100 : null
+    gps_pct: totalRecs > 0 ? (gpsRecs / totalRecs) * 100 : null,
+    moving_s: movingS,
+    vam_m_per_h: vamMPerH
   };
 }

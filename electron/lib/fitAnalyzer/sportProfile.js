@@ -2,18 +2,21 @@
 // behavior profile that controls which derived metrics make sense.
 //
 // Profile flags:
-//   gap          — apply Minetti grade-adjusted pace
-//   drift        — surface HR drift across lap halves
-//   decoupling   — surface Pa:HR decoupling / efficiency factor
-//   pace_primary — pace is a meaningful primary metric (false for skiing)
+//   gap             — apply Minetti grade-adjusted pace
+//   drift           — surface HR drift across lap halves
+//   decoupling      — surface Pa:HR decoupling / efficiency factor
+//   pace_primary    — pace is a meaningful primary metric (false for skiing)
+//   vam             — surface vertical ascent rate (m/h or ft/h)
+//   ascent_segments — auto-detect & summarize big climbs
+//   grade_buckets   — HR/time histogram by grade band
 
 const PROFILES = {
-  running:       { gap: true,  drift: true,  decoupling: true,  pace_primary: true  },
-  hiking:        { gap: false, drift: true,  decoupling: false, pace_primary: true  },
-  cycling:       { gap: false, drift: true,  decoupling: true,  pace_primary: true  },
-  ski_touring:   { gap: false, drift: false, decoupling: false, pace_primary: false },
-  alpine_skiing: { gap: false, drift: false, decoupling: false, pace_primary: false },
-  default:       { gap: true,  drift: true,  decoupling: true,  pace_primary: true  }
+  running:       { gap: true,  drift: true,  decoupling: true,  pace_primary: true,  vam: false, ascent_segments: false, grade_buckets: false },
+  hiking:        { gap: false, drift: true,  decoupling: false, pace_primary: true,  vam: true,  ascent_segments: true,  grade_buckets: true  },
+  cycling:       { gap: false, drift: true,  decoupling: true,  pace_primary: true,  vam: true,  ascent_segments: true,  grade_buckets: false },
+  ski_touring:   { gap: false, drift: false, decoupling: false, pace_primary: false, vam: true,  ascent_segments: true,  grade_buckets: true  },
+  alpine_skiing: { gap: false, drift: false, decoupling: false, pace_primary: false, vam: false, ascent_segments: false, grade_buckets: false },
+  default:       { gap: true,  drift: true,  decoupling: true,  pace_primary: true,  vam: false, ascent_segments: false, grade_buckets: false }
 };
 
 export function resolveProfile(sport, subSport) {

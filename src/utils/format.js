@@ -71,3 +71,10 @@ export function formatVertPerDistance(verticalPerKmMeters, units) {
   }
   return `${Math.round(verticalPerKmMeters)} m/km`;
 }
+
+// VAM: meters of climbing per hour of moving time. Render as ft/h or m/h.
+export function formatVAM(mPerHour, units) {
+  if (mPerHour == null || !Number.isFinite(mPerHour)) return '—';
+  if (units === 'imperial') return `${Math.round(mPerHour / M_PER_FT)} ft/h`;
+  return `${Math.round(mPerHour)} m/h`;
+}

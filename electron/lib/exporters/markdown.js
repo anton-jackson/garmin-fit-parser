@@ -8,7 +8,8 @@ import {
   formatDistance,
   formatElevation,
   formatPace,
-  formatVertPerDistance
+  formatVertPerDistance,
+  formatVAM
 } from './format.js';
 
 function lapTimeStr(lap) {
@@ -29,7 +30,7 @@ function pct(v, dp = 1) {
 }
 
 export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSeriesByIndex, units = 'imperial' }) {
-  const { activity, session, laps, profile, profile_flags } = analysis;
+  const { activity, session, laps, profile, profile_flags, ascent_segments, grade_buckets } = analysis;
   const flags = profile_flags ?? { drift: true, decoupling: true, gap: true, pace_primary: true };
   const distUnit = distanceLabel(units);
   const elevUnit = elevationLabel(units);
@@ -54,6 +55,9 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
   if (flags.pace_primary) {
     summaryLines.push(`**Avg pace:** ${formatPace(session?.avg_pace_s_per_km, units)}`);
   }
+  if (flags.vam && session?.vam_m_per_h) {
+    summaryLines.push(`**VAM:** ${formatVAM(session.vam_m_per_h, units)}`);
+  }
   if (session?.avg_power) summaryLines.push(`**Avg power:** ${int(session.avg_power)} W`);
   if (session?.training_stress_score) summaryLines.push(`**TSS:** ${num(session.training_stress_score, 0)}`);
 
@@ -69,10 +73,12 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
   const showPace = flags.pace_primary;
   const showDrift = flags.drift;
   const showDecoupling = flags.decoupling;
+  const showVAM = flags.vam;
 
   const headerCols = ['#', 'Type', 'Time', `Dist (${distUnit})`];
   if (showPace) headerCols.push('Pace');
   headerCols.push('Avg HR', 'Max HR', `Vert↑ (${elevUnit})`, `Vert↓ (${elevUnit})`, 'Grade');
+  if (showVAM) headerCols.push('VAM');
   if (showDrift) headerCols.push('HR drift');
   if (showDecoupling) headerCols.push('Pa:HR drift');
 
@@ -96,6 +102,7 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
         formatElevation(l.total_descent_m, units),
         pct(l.avg_grade_pct)
       );
+      if (showVAM) cells.push(formatVAM(l.vam_m_per_h, units));
       if (showDrift) cells.push(pct(l.hr_drift_pct));
       if (showDecoupling) cells.push(pct(l.pa_hr_decoupling_pct));
       return `| ${cells.join(' | ')} |`;
@@ -128,6 +135,7 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
       `**Avg HR:** ${int(l.avg_heart_rate)} (max ${int(l.max_heart_rate)})`
     ];
     if (showPace) headerBitsArr.push(`**Avg pace:** ${formatPace(l.avg_pace_s_per_km, units)}`);
+    if (showVAM && l.vam_m_per_h) headerBitsArr.push(`**VAM:** ${formatVAM(l.vam_m_per_h, units)}`);
     headerBitsArr.push(
       `**Vert:** ↑${formatElevation(l.total_ascent_m, units)} ↓${formatElevation(l.total_descent_m, units)} ${elevUnit} (${pct(l.avg_grade_pct)})`
     );
@@ -143,22 +151,30 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
 
     // Bin table — show GAP only when profile uses it.
     const showGap = flags.gap;
+    let firstColLabel;
+    if (binUnit === 'meters_ascent') firstColLabel = `Elev gain (${elevUnit})`;
+    else if (binUnit === 'meters') firstColLabel = `Dist (${distUnit})`;
+    else firstColLabel = 't';
     const tableHead = [
-      binUnit === 'meters' ? `Dist (${distUnit})` : 't',
+      firstColLabel,
+      ...(binUnit === 'meters_ascent' ? ['t'] : []),
       ...(showPace ? ['Pace'] : []),
       'HR',
       'Grade',
+      ...(showVAM ? ['VAM'] : []),
       ...(showGap ? ['GAP'] : []),
       'Power'
     ];
     const rows = series.series.map((b) => {
-      const tCell =
-        binUnit === 'meters'
-          ? formatDistance(b.cumulative_distance_m, units, 2)
-          : secondsToHms(b.t_offset_s);
-      const cells = [tCell];
+      let firstCell;
+      if (binUnit === 'meters_ascent') firstCell = formatElevation(b.cumulative_ascent_m, units);
+      else if (binUnit === 'meters') firstCell = formatDistance(b.cumulative_distance_m, units, 2);
+      else firstCell = secondsToHms(b.t_offset_s);
+      const cells = [firstCell];
+      if (binUnit === 'meters_ascent') cells.push(secondsToHms(b.t_offset_s));
       if (showPace) cells.push(formatPace(b.avg_pace_s_per_km, units));
       cells.push(int(b.avg_hr), pct(b.grade_pct));
+      if (showVAM) cells.push(formatVAM(b.vam_m_per_h, units));
       if (showGap) cells.push(formatPace(b.gap_s_per_km, units));
       cells.push(int(b.avg_power));
       return `| ${cells.join(' | ')} |`;
@@ -176,11 +192,42 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
     ].join('\n');
   });
 
-  return [
+  // Optional sections: ascent segments + grade buckets (sport-aware).
+  const sections = [
     `# ${title}`,
     '',
     summaryLines.join('  \n'),
-    '',
+    ''
+  ];
+
+  if (flags.ascent_segments && ascent_segments && ascent_segments.length > 0) {
+    sections.push('## Ascent segments', '');
+    sections.push(
+      `| # | Start | Duration | Ascent (${elevUnit}) | Dist (${distUnit}) | Avg grade | VAM | Avg HR | Max HR |`,
+      `| --- | --- | --- | --- | --- | --- | --- | --- | --- |`,
+      ...ascent_segments.map((s) =>
+        `| ${s.segment_index + 1} | ${isoDate(s.start_time)} | ${secondsToHms(s.moving_s ?? s.elapsed_s)} | ${formatElevation(s.ascent_m, units)} | ${formatDistance(s.distance_m, units)} | ${pct(s.avg_grade_pct)} | ${formatVAM(s.vam_m_per_h, units)} | ${int(s.avg_hr)} | ${int(s.max_hr)} |`
+      ),
+      ''
+    );
+  }
+
+  if (flags.grade_buckets && grade_buckets && grade_buckets.length > 0) {
+    const nonzero = grade_buckets.filter((b) => (b.record_count ?? 0) > 0);
+    if (nonzero.length > 0) {
+      sections.push('## Time at grade', '');
+      sections.push(
+        `| Grade band | Time | Avg HR |`,
+        `| --- | --- | --- |`,
+        ...nonzero.map((b) =>
+          `| ${b.grade_band}% | ${secondsToHms(b.time_s)} | ${int(b.avg_hr)} |`
+        ),
+        ''
+      );
+    }
+  }
+
+  sections.push(
     '## Laps',
     '',
     lapTable,
@@ -188,5 +235,7 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
     '## Lap detail',
     '',
     lapDetailSections.join('\n\n')
-  ].join('\n');
+  );
+
+  return sections.join('\n');
 }

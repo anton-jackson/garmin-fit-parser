@@ -2,6 +2,7 @@ import { parseRaw, buildStructured } from './parse.js';
 import { annotateRecords, annotateLaps, annotateSession } from './derive.js';
 import { binAllLaps } from './bin.js';
 import { resolveProfile, profileFlags } from './sportProfile.js';
+import { detectAscentSegments, gradeBucketHistogram } from './segments.js';
 
 /**
  * Parse a FIT buffer and return a fully analyzed structure:
@@ -35,6 +36,10 @@ export async function analyzeFITFile(buffer, opts = {}) {
     session?.sport ?? structured.activity?.sport ?? null,
     session?.sub_sport ?? structured.activity?.sub_sport ?? null
   );
+  const flags = profileFlags(profile);
+
+  const ascentSegments = flags.ascent_segments ? detectAscentSegments(records) : [];
+  const gradeBuckets = flags.grade_buckets ? gradeBucketHistogram(records) : [];
 
   return {
     activity: structured.activity,
@@ -44,7 +49,9 @@ export async function analyzeFITFile(buffer, opts = {}) {
     records,
     lapSeries,
     profile,
-    profile_flags: profileFlags(profile)
+    profile_flags: flags,
+    ascent_segments: ascentSegments,
+    grade_buckets: gradeBuckets
   };
 }
 
@@ -52,3 +59,4 @@ export { parseRaw, buildStructured } from './parse.js';
 export { annotateRecords, annotateLaps, annotateSession, gradeAdjustPace } from './derive.js';
 export { binLap, binAllLaps, defaultBinSeconds } from './bin.js';
 export { resolveProfile, profileFlags } from './sportProfile.js';
+export { detectAscentSegments, gradeBucketHistogram } from './segments.js';

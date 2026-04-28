@@ -166,6 +166,7 @@ function OutputBundle({
           <div className="flex gap-3">
             <Radio name="binMode" value="time" current={binMode} onChange={onBinModeChange} label="By time" />
             <Radio name="binMode" value="distance" current={binMode} onChange={onBinModeChange} label="By distance" />
+            <Radio name="binMode" value="elevation" current={binMode} onChange={onBinModeChange} label="By elevation gain" />
           </div>
           <label className="flex items-center gap-2 text-sm">
             <span className="text-gray-600">Bin size:</span>
@@ -173,11 +174,17 @@ function OutputBundle({
               type="number"
               min="1"
               value={binSize ?? ''}
-              placeholder={binMode === 'time' ? 'auto (10–60s)' : '100'}
+              placeholder={
+                binMode === 'time' ? 'auto (10–60s)' :
+                binMode === 'elevation' ? '50' : '100'
+              }
               onChange={(e) => onBinSizeChange(e.target.value === '' ? null : Number(e.target.value))}
               className="w-28 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-gray-500 text-xs">{binMode === 'time' ? 'seconds' : 'meters'}</span>
+            <span className="text-gray-500 text-xs">
+              {binMode === 'time' ? 'seconds' : 'meters'}
+              {binMode === 'elevation' ? ' of ascent' : ''}
+            </span>
           </label>
         </div>
       </div>

@@ -22,7 +22,7 @@ function altField(r) {
   return r.enhanced_altitude ?? r.altitude ?? null;
 }
 
-function summarizeBin(bucket, lapStartMs, lapStartDist) {
+function summarizeBin(bucket, lapStartMs, lapStartDist, lapStartAlt) {
   if (bucket.length === 0) return null;
   const first = bucket[0];
   const last = bucket[bucket.length - 1];
@@ -54,19 +54,39 @@ function summarizeBin(bucket, lapStartMs, lapStartDist) {
       ? gradeAdjustPace(avgPace, gradePct / 100)
       : avgPace;
 
+  // Cumulative ascent within the bin (sum of positive altitude deltas).
+  let ascentM = 0;
+  let prev = null;
+  for (const r of bucket) {
+    const a = altField(r);
+    if (prev != null && a != null && a > prev) ascentM += a - prev;
+    if (a != null) prev = a;
+  }
+  if (ascentM === 0 && altStart != null && altEnd != null && altEnd > altStart) {
+    ascentM = altEnd - altStart;
+  }
+
+  const durationS =
+    tStartMs != null && tEndMs != null ? Math.round((tEndMs - tStartMs) / 1000) : null;
+  const movingS = bucket.filter((r) => r.is_moving).length || null;
+  const vamMPerH = movingS && ascentM > 0 ? ascentM / (movingS / 3600) : null;
+
   return {
     t_offset_s: tOffsetSec,
-    duration_s:
-      tStartMs != null && tEndMs != null ? Math.round((tEndMs - tStartMs) / 1000) : null,
+    duration_s: durationS,
     distance_m: distM,
     cumulative_distance_m:
       distEnd != null && lapStartDist != null ? distEnd - lapStartDist : null,
+    cumulative_ascent_m:
+      altEnd != null && lapStartAlt != null ? Math.max(altEnd - lapStartAlt, 0) : null,
+    ascent_m: ascentM > 0 ? ascentM : null,
     avg_pace_s_per_km: avgPace,
     avg_hr: avg(bucket.map((r) => r.heart_rate)),
     avg_power: avg(bucket.map((r) => r.power)),
     avg_cadence: avg(bucket.map((r) => r.cadence ?? r.running_cadence)),
     grade_pct: gradePct,
-    gap_s_per_km: gapPace
+    gap_s_per_km: gapPace,
+    vam_m_per_h: vamMPerH
   };
 }
 
@@ -83,17 +103,40 @@ export function binLap(
 
   const lapStartMs = toMs(lap.start_time) ?? toMs(lapRecords[0].timestamp);
   const lapStartDist = lapRecords[0].distance ?? null;
+  const lapStartAlt = lapRecords[0].enhanced_altitude ?? lapRecords[0].altitude ?? null;
   const lapDurationSec = lap.total_elapsed_time ?? lap.total_timer_time ?? null;
 
   let size = binSize;
   if (size == null) {
-    size = mode === 'time' ? defaultBinSeconds(lapDurationSec) : 100;
+    if (mode === 'time') size = defaultBinSeconds(lapDurationSec);
+    else if (mode === 'elevation') size = 50; // 50 m ≈ 165 ft
+    else size = 100;
   }
 
   const buckets = [];
   let current = [];
 
-  if (mode === 'time') {
+  if (mode === 'elevation') {
+    // Bin by cumulative ascent within the lap. Each bucket closes once the
+    // running total of positive altitude deltas exceeds the bin size.
+    let cumGain = 0;
+    let prevAlt = null;
+    let bucketEnd = size;
+    for (const r of lapRecords) {
+      const a = r.enhanced_altitude ?? r.altitude;
+      if (a != null && prevAlt != null && a > prevAlt) {
+        cumGain += a - prevAlt;
+      }
+      if (a != null) prevAlt = a;
+      current.push(r);
+      while (cumGain >= bucketEnd) {
+        if (current.length) buckets.push(current);
+        current = [];
+        bucketEnd += size;
+      }
+    }
+    if (current.length) buckets.push(current);
+  } else if (mode === 'time') {
     const sizeMs = size * 1000;
     let bucketEnd = lapStartMs != null ? lapStartMs + sizeMs : null;
     for (const r of lapRecords) {
@@ -130,14 +173,15 @@ export function binLap(
   }
 
   const series = buckets
-    .map((b) => summarizeBin(b, lapStartMs, lapStartDist))
+    .map((b) => summarizeBin(b, lapStartMs, lapStartDist, lapStartAlt))
     .filter((s) => s != null);
 
   return {
     lap_index: lap.lap_index,
     mode,
     bin_size: size,
-    bin_unit: mode === 'time' ? 'seconds' : 'meters',
+    bin_unit:
+      mode === 'time' ? 'seconds' : mode === 'elevation' ? 'meters_ascent' : 'meters',
     series
   };
 }

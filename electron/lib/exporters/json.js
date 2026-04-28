@@ -4,7 +4,7 @@
 // includeRecords: true to embed them.
 
 export function buildJSON(analysis, { selectedLapIndices, includeRecords = false, lapSeriesByIndex, units = 'metric' }) {
-  const { activity, session, laps, profile, profile_flags } = analysis;
+  const { activity, session, laps, profile, profile_flags, ascent_segments, grade_buckets } = analysis;
 
   const lapsOut = laps
     .filter((l) => selectedLapIndices.has(l.lap_index))
@@ -32,6 +32,8 @@ export function buildJSON(analysis, { selectedLapIndices, includeRecords = false
       efficiency_factor_first_half: l.efficiency_factor_first_half ?? null,
       efficiency_factor_second_half: l.efficiency_factor_second_half ?? null,
       moving_pct: l.moving_pct ?? null,
+      moving_s: l.moving_s ?? null,
+      vam_m_per_h: l.vam_m_per_h ?? null,
       series: lapSeriesByIndex.get(l.lap_index) ?? null
     }));
 
@@ -72,10 +74,14 @@ export function buildJSON(analysis, { selectedLapIndices, includeRecords = false
           total_calories: session.total_calories ?? null,
           moving_pct: session.moving_pct ?? null,
           gps_pct: session.gps_pct ?? null,
+          moving_s: session.moving_s ?? null,
+          vam_m_per_h: session.vam_m_per_h ?? null,
           record_count: session.record_count ?? null,
           lap_count: session.lap_count ?? null
         }
       : null,
+    ascent_segments: ascent_segments ?? [],
+    grade_buckets: grade_buckets ?? [],
     laps: lapsOut
   };
 
