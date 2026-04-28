@@ -1,3 +1,73 @@
+const PRESET_OPTIONS = [
+  {
+    value: 'agent',
+    title: 'For an AI agent',
+    description:
+      'Markdown summary + structured JSON. Compact, with pace / grade / HR drift pre-computed per lap and per bin so the agent doesn\'t have to do arithmetic. Best for feeding the activity to an LLM.'
+  },
+  {
+    value: 'spreadsheet',
+    title: 'For a spreadsheet',
+    description: 'Records CSV with one row per sample, filtered to the laps you selected. Open in Excel or Google Sheets.'
+  },
+  {
+    value: 'both',
+    title: 'Both',
+    description: 'All three files: markdown, JSON, and records CSV.'
+  },
+  {
+    value: 'custom',
+    title: 'Custom',
+    description: 'Pick formats individually below.'
+  }
+];
+
+function PresetCard({ option, current, onChange }) {
+  const selected = current === option.value;
+  return (
+    <label
+      className={`block cursor-pointer rounded-lg border-2 p-3 transition-colors ${
+        selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <input
+          type="radio"
+          name="preset"
+          value={option.value}
+          checked={selected}
+          onChange={() => onChange(option.value)}
+          className="mt-1 text-blue-600 focus:ring-blue-500"
+        />
+        <div>
+          <div className="text-sm font-medium text-gray-800">{option.title}</div>
+          <div className="text-xs text-gray-600 mt-0.5 leading-snug">{option.description}</div>
+        </div>
+      </div>
+    </label>
+  );
+}
+
+function Check({ checked, onChange, label, hint, disabled }) {
+  return (
+    <label
+      className={`flex items-start gap-2 text-sm ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+      />
+      <span>
+        {label}
+        {hint && <span className="block text-xs text-gray-500">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
 function Radio({ name, value, current, onChange, label }) {
   return (
     <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -10,23 +80,6 @@ function Radio({ name, value, current, onChange, label }) {
         className="text-blue-600 focus:ring-blue-500"
       />
       <span>{label}</span>
-    </label>
-  );
-}
-
-function Check({ checked, onChange, label, hint }) {
-  return (
-    <label className="flex items-start gap-2 text-sm cursor-pointer">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
-      />
-      <span>
-        {label}
-        {hint && <span className="block text-xs text-gray-500">{hint}</span>}
-      </span>
     </label>
   );
 }
@@ -44,6 +97,8 @@ function OutputBundle({
   onIncludeGradeChange,
   includeRawRecordsInJson,
   onIncludeRawChange,
+  units,
+  onUnitsChange,
   selectedLapCount,
   onExport,
   isLoading
@@ -52,6 +107,8 @@ function OutputBundle({
     !isLoading &&
     selectedLapCount > 0 &&
     (formats.markdown || formats.json || formats.csv);
+
+  const csvDisabled = !formats.csv;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-5">
@@ -64,11 +121,10 @@ function OutputBundle({
 
       <div>
         <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Preset</div>
-        <div className="flex gap-4">
-          <Radio name="preset" value="agent" current={preset} onChange={onPresetChange} label="AI agent (md + json)" />
-          <Radio name="preset" value="spreadsheet" current={preset} onChange={onPresetChange} label="Spreadsheet (csv)" />
-          <Radio name="preset" value="both" current={preset} onChange={onPresetChange} label="Both" />
-          <Radio name="preset" value="custom" current={preset} onChange={onPresetChange} label="Custom" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {PRESET_OPTIONS.map((opt) => (
+            <PresetCard key={opt.value} option={opt} current={preset} onChange={onPresetChange} />
+          ))}
         </div>
       </div>
 
@@ -97,6 +153,14 @@ function OutputBundle({
       </div>
 
       <div>
+        <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Units</div>
+        <div className="flex gap-4">
+          <Radio name="units" value="imperial" current={units} onChange={onUnitsChange} label="Imperial (mi / ft)" />
+          <Radio name="units" value="metric" current={units} onChange={onUnitsChange} label="Metric (km / m)" />
+        </div>
+      </div>
+
+      <div>
         <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Per-lap binned series</div>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex gap-3">
@@ -119,19 +183,29 @@ function OutputBundle({
       </div>
 
       <div>
-        <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Options</div>
+        <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">CSV options</div>
         <div className="space-y-2">
           <Check
-            checked={includeGrade}
+            checked={includeGrade && !csvDisabled}
+            disabled={csvDisabled}
             onChange={onIncludeGradeChange}
-            label="Include grade columns in CSV"
-            hint="Adds grade_pct, grade_pct_smoothed, gap_s_per_km"
+            label="Add grade columns to CSV"
+            hint={
+              csvDisabled
+                ? 'Enable Records CSV above to use this option. Grade is always present in markdown and JSON.'
+                : 'Adds grade_pct, grade_pct_smoothed, gap_s_per_km columns.'
+            }
           />
           <Check
             checked={includeRawRecordsInJson}
+            disabled={!formats.json}
             onChange={onIncludeRawChange}
             label="Embed raw records in JSON"
-            hint="Token-heavy; only enable if the agent needs 1 Hz samples"
+            hint={
+              !formats.json
+                ? 'Enable JSON above to use this option.'
+                : 'Token-heavy; only enable if the agent needs 1 Hz samples.'
+            }
           />
         </div>
       </div>

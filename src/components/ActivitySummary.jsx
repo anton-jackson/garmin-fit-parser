@@ -1,4 +1,14 @@
-import { secondsToHms, paceToStr, int, km, isoDate } from '../utils/format';
+import {
+  secondsToHms,
+  int,
+  isoDate,
+  distanceLabel,
+  elevationLabel,
+  formatDistance,
+  formatElevation,
+  formatPace,
+  formatVertPerDistance
+} from '../utils/format';
 
 function Stat({ label, value }) {
   return (
@@ -9,12 +19,15 @@ function Stat({ label, value }) {
   );
 }
 
-function ActivitySummary({ analysis }) {
+function ActivitySummary({ analysis, units }) {
   if (!analysis) return null;
   const { activity, session, laps } = analysis;
   const sport = session?.sport ?? activity?.sport ?? 'activity';
   const start = session?.start_time ?? activity?.timestamp ?? laps[0]?.start_time;
   const elapsed = session?.total_elapsed_time ?? session?.total_timer_time;
+
+  const ascent = session?.total_ascent_m ?? session?.total_ascent;
+  const descent = session?.total_descent_m ?? session?.total_descent;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -24,15 +37,15 @@ function ActivitySummary({ analysis }) {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Stat label="Duration" value={secondsToHms(elapsed)} />
-        <Stat label="Distance" value={`${km(session?.total_distance)} km`} />
+        <Stat label="Distance" value={`${formatDistance(session?.total_distance, units)} ${distanceLabel(units)}`} />
         <Stat
           label="Elevation"
-          value={`↑${int(session?.total_ascent_m ?? session?.total_ascent)} / ↓${int(session?.total_descent_m ?? session?.total_descent)} m`}
+          value={`↑${formatElevation(ascent, units)} / ↓${formatElevation(descent, units)} ${elevationLabel(units)}`}
         />
-        <Stat label="Vert/km" value={`${int(session?.vertical_per_km_m)} m`} />
+        <Stat label="Vert" value={formatVertPerDistance(session?.vertical_per_km_m, units)} />
         <Stat label="Avg HR" value={`${int(session?.avg_heart_rate)} bpm`} />
         <Stat label="Max HR" value={`${int(session?.max_heart_rate)} bpm`} />
-        <Stat label="Avg pace" value={paceToStr(session?.avg_pace_s_per_km)} />
+        <Stat label="Avg pace" value={formatPace(session?.avg_pace_s_per_km, units)} />
         <Stat label="Laps" value={String(laps.length)} />
       </div>
     </div>

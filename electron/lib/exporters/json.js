@@ -3,7 +3,7 @@
 // Default shape excludes the raw 1Hz records array (token-heavy). Pass
 // includeRecords: true to embed them.
 
-export function buildJSON(analysis, { selectedLapIndices, includeRecords = false, lapSeriesByIndex }) {
+export function buildJSON(analysis, { selectedLapIndices, includeRecords = false, lapSeriesByIndex, units = 'metric' }) {
   const { activity, session, laps } = analysis;
 
   const lapsOut = laps
@@ -32,6 +32,16 @@ export function buildJSON(analysis, { selectedLapIndices, includeRecords = false
     }));
 
   const out = {
+    units: {
+      // Underlying numeric values are always SI (meters, m/s, seconds-per-km).
+      // The `display` field hints which units the markdown was rendered in.
+      values: 'SI',
+      display: units,
+      distance: 'meters',
+      speed: 'meters_per_second',
+      pace: 'seconds_per_km',
+      elevation: 'meters'
+    },
     activity: {
       sport: session?.sport ?? activity?.sport ?? null,
       sub_sport: session?.sub_sport ?? null,

@@ -36,6 +36,7 @@ function App() {
   const [binSize, setBinSize] = useState(null);
   const [includeGrade, setIncludeGrade] = useState(false);
   const [includeRawRecordsInJson, setIncludeRawRecordsInJson] = useState(false);
+  const [units, setUnits] = useState('imperial');
 
   // Legacy raw-field selection (Advanced disclosure)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -145,7 +146,8 @@ function App() {
           binMode,
           binSize,
           includeGrade,
-          includeRawRecordsInJson
+          includeRawRecordsInJson,
+          units
         },
         suggestedBaseName
       );
@@ -165,7 +167,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [analysis, selectedLaps, formats, binMode, binSize, includeGrade, includeRawRecordsInJson, electronAPI, suggestedBaseName]);
+  }, [analysis, selectedLaps, formats, binMode, binSize, includeGrade, includeRawRecordsInJson, units, electronAPI, suggestedBaseName]);
 
   // Legacy raw-CSV export (Advanced)
   const handleLegacyExport = useCallback(async () => {
@@ -270,7 +272,7 @@ function App() {
           isLoading={isLoading}
         />
 
-        {hasAnalysis && <ActivitySummary analysis={analysis} />}
+        {hasAnalysis && <ActivitySummary analysis={analysis} units={units} />}
 
         {hasAnalysis && (
           <LapPicker
@@ -279,6 +281,7 @@ function App() {
             onToggleLap={handleToggleLap}
             onSelectAll={handleSelectAllLaps}
             onClearAll={handleClearAllLaps}
+            units={units}
           />
         )}
 
@@ -296,6 +299,8 @@ function App() {
             onIncludeGradeChange={setIncludeGrade}
             includeRawRecordsInJson={includeRawRecordsInJson}
             onIncludeRawChange={setIncludeRawRecordsInJson}
+            units={units}
+            onUnitsChange={setUnits}
             selectedLapCount={selectedLaps.size}
             onExport={handleExportBundle}
             isLoading={isLoading}

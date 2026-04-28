@@ -1,4 +1,16 @@
-import { secondsToHms, paceToStr, num, int, km, isoDate } from './format.js';
+import {
+  secondsToHms,
+  num,
+  int,
+  isoDate,
+  distanceLabel,
+  elevationLabel,
+  formatDistance,
+  formatElevation,
+  formatPace,
+  formatVertPerDistance,
+  metersToElevation
+} from './format.js';
 
 function lapTimeStr(lap) {
   return secondsToHms(lap.total_elapsed_time ?? lap.total_timer_time);
@@ -10,21 +22,26 @@ function fileBaseName(filePath) {
   return name.replace(/\.fit$/i, '');
 }
 
-export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSeriesByIndex }) {
+export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSeriesByIndex, units = 'imperial' }) {
   const { activity, session, laps } = analysis;
+  const distUnit = distanceLabel(units);
+  const elevUnit = elevationLabel(units);
 
   const sport = session?.sport ?? activity?.sport ?? 'activity';
   const startTime = session?.start_time ?? activity?.timestamp ?? laps[0]?.start_time;
   const title = `${sport} — ${isoDate(startTime) || fileBaseName(sourceFile) || 'untitled'}`;
 
+  const sessionAscent = session?.total_ascent_m ?? session?.total_ascent;
+  const sessionDescent = session?.total_descent_m ?? session?.total_descent;
+
   const summaryLines = [
     `**Duration:** ${secondsToHms(session?.total_elapsed_time ?? session?.total_timer_time)}`,
-    `**Distance:** ${km(session?.total_distance)} km`,
-    `**Elevation:** ↑${int(session?.total_ascent_m ?? session?.total_ascent)} m / ↓${int(session?.total_descent_m ?? session?.total_descent)} m`,
-    `**Vertical/km:** ${num(session?.vertical_per_km_m, 1)} m`,
+    `**Distance:** ${formatDistance(session?.total_distance, units)} ${distUnit}`,
+    `**Elevation:** ↑${formatElevation(sessionAscent, units)} / ↓${formatElevation(sessionDescent, units)} ${elevUnit}`,
+    `**Vertical:** ${formatVertPerDistance(session?.vertical_per_km_m, units)}`,
     `**Avg HR:** ${int(session?.avg_heart_rate)} bpm` +
       (session?.max_heart_rate ? ` (max ${int(session.max_heart_rate)})` : ''),
-    `**Avg pace:** ${paceToStr(session?.avg_pace_s_per_km)}`
+    `**Avg pace:** ${formatPace(session?.avg_pace_s_per_km, units)}`
   ];
   if (session?.avg_power) summaryLines.push(`**Avg power:** ${int(session.avg_power)} W`);
   if (session?.training_stress_score) summaryLines.push(`**TSS:** ${num(session.training_stress_score, 0)}`);
@@ -32,15 +49,11 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
   const lapsToShow = laps.filter((l) => selectedLapIndices.has(l.lap_index));
 
   const lapTable = [
-    '| # | Time | Dist (km) | Pace | GAP | Avg HR | Max HR | Vert↑ | Vert↓ | Grade | HR drift | Pa:HR drift |',
-    '|---|------|-----------|------|-----|--------|--------|-------|-------|-------|----------|-------------|',
-    ...lapsToShow.map((l) => {
-      const gap =
-        l.avg_grade_pct != null && l.avg_pace_s_per_km != null
-          ? null // GAP at lap level requires the bin-weighted approach; leave blank for now
-          : null;
-      return `| ${l.lap_index + 1} | ${lapTimeStr(l)} | ${km(l.total_distance)} | ${paceToStr(l.avg_pace_s_per_km)} | ${gap == null ? '' : paceToStr(gap)} | ${int(l.avg_heart_rate)} | ${int(l.max_heart_rate)} | ${int(l.total_ascent_m)} | ${int(l.total_descent_m)} | ${num(l.avg_grade_pct, 1)}% | ${num(l.hr_drift_pct, 1)}% | ${num(l.pa_hr_decoupling_pct, 1)}% |`;
-    })
+    `| # | Time | Dist (${distUnit}) | Pace | Avg HR | Max HR | Vert↑ (${elevUnit}) | Vert↓ (${elevUnit}) | Grade | HR drift | Pa:HR drift |`,
+    '|---|------|------|------|--------|--------|-------|-------|-------|----------|-------------|',
+    ...lapsToShow.map((l) =>
+      `| ${l.lap_index + 1} | ${lapTimeStr(l)} | ${formatDistance(l.total_distance, units)} | ${formatPace(l.avg_pace_s_per_km, units)} | ${int(l.avg_heart_rate)} | ${int(l.max_heart_rate)} | ${formatElevation(l.total_ascent_m, units)} | ${formatElevation(l.total_descent_m, units)} | ${num(l.avg_grade_pct, 1)}% | ${num(l.hr_drift_pct, 1)}% | ${num(l.pa_hr_decoupling_pct, 1)}% |`
+    )
   ].join('\n');
 
   const lapDetailSections = lapsToShow.map((l) => {
@@ -49,10 +62,10 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
     const binUnit = series?.bin_unit;
     const headerBits = [
       `**Lap time:** ${lapTimeStr(l)}`,
-      `**Distance:** ${km(l.total_distance)} km`,
+      `**Distance:** ${formatDistance(l.total_distance, units)} ${distUnit}`,
       `**Avg HR:** ${int(l.avg_heart_rate)} (max ${int(l.max_heart_rate)})`,
-      `**Avg pace:** ${paceToStr(l.avg_pace_s_per_km)}`,
-      `**Vert:** ↑${int(l.total_ascent_m)} ↓${int(l.total_descent_m)} m (${num(l.avg_grade_pct, 1)}%)`,
+      `**Avg pace:** ${formatPace(l.avg_pace_s_per_km, units)}`,
+      `**Vert:** ↑${formatElevation(l.total_ascent_m, units)} ↓${formatElevation(l.total_descent_m, units)} ${elevUnit} (${num(l.avg_grade_pct, 1)}%)`,
       `**HR drift:** ${num(l.hr_drift_pct, 1)}% · **Pa:HR decoupling:** ${num(l.pa_hr_decoupling_pct, 1)}%`
     ].join('  \n');
 
@@ -62,15 +75,15 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
 
     const tableHead =
       binUnit === 'meters'
-        ? `| Dist (m) | Pace | HR | Grade | GAP | Power |`
+        ? `| Dist (${elevUnit === 'ft' ? 'mi' : 'm'}) | Pace | HR | Grade | GAP | Power |`
         : `| t | Pace | HR | Grade | GAP | Power |`;
     const tableSep = `|---|------|----|-------|-----|-------|`;
     const rows = series.series.map((b) => {
       const tCell =
         binUnit === 'meters'
-          ? int(b.cumulative_distance_m)
+          ? formatDistance(b.cumulative_distance_m, units, 2)
           : secondsToHms(b.t_offset_s);
-      return `| ${tCell} | ${paceToStr(b.avg_pace_s_per_km)} | ${int(b.avg_hr)} | ${num(b.grade_pct, 1)}% | ${paceToStr(b.gap_s_per_km)} | ${int(b.avg_power)} |`;
+      return `| ${tCell} | ${formatPace(b.avg_pace_s_per_km, units)} | ${int(b.avg_hr)} | ${num(b.grade_pct, 1)}% | ${formatPace(b.gap_s_per_km, units)} | ${int(b.avg_power)} |`;
     });
 
     return [

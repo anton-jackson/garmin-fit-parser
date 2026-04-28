@@ -1,6 +1,15 @@
-import { secondsToHms, paceToStr, int, num, km } from '../utils/format';
+import {
+  secondsToHms,
+  int,
+  num,
+  distanceLabel,
+  elevationLabel,
+  formatDistance,
+  formatElevation,
+  formatPace
+} from '../utils/format';
 
-function LapPicker({ laps, selectedLaps, onToggleLap, onSelectAll, onClearAll }) {
+function LapPicker({ laps, selectedLaps, onToggleLap, onSelectAll, onClearAll, units }) {
   if (!laps || laps.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-sm text-gray-500">
@@ -10,6 +19,8 @@ function LapPicker({ laps, selectedLaps, onToggleLap, onSelectAll, onClearAll })
   }
 
   const allSelected = selectedLaps.size === laps.length;
+  const distUnit = distanceLabel(units);
+  const elevUnit = elevationLabel(units);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -45,11 +56,11 @@ function LapPicker({ laps, selectedLaps, onToggleLap, onSelectAll, onClearAll })
               <th className="py-2 pr-2"></th>
               <th className="py-2 pr-3">#</th>
               <th className="py-2 pr-3">Time</th>
-              <th className="py-2 pr-3">Dist (km)</th>
+              <th className="py-2 pr-3">Dist ({distUnit})</th>
               <th className="py-2 pr-3">Pace</th>
               <th className="py-2 pr-3">Avg HR</th>
               <th className="py-2 pr-3">Max HR</th>
-              <th className="py-2 pr-3">Vert ↑/↓</th>
+              <th className="py-2 pr-3">Vert ↑/↓ ({elevUnit})</th>
               <th className="py-2 pr-3">Grade</th>
               <th className="py-2 pr-3">Drift</th>
             </tr>
@@ -74,12 +85,12 @@ function LapPicker({ laps, selectedLaps, onToggleLap, onSelectAll, onClearAll })
                   </td>
                   <td className="py-2 pr-3 font-medium text-gray-800">{lap.lap_index + 1}</td>
                   <td className="py-2 pr-3">{secondsToHms(lap.total_elapsed_time ?? lap.total_timer_time)}</td>
-                  <td className="py-2 pr-3">{km(lap.total_distance)}</td>
-                  <td className="py-2 pr-3">{paceToStr(lap.avg_pace_s_per_km)}</td>
+                  <td className="py-2 pr-3">{formatDistance(lap.total_distance, units)}</td>
+                  <td className="py-2 pr-3">{formatPace(lap.avg_pace_s_per_km, units)}</td>
                   <td className="py-2 pr-3">{int(lap.avg_heart_rate)}</td>
                   <td className="py-2 pr-3">{int(lap.max_heart_rate)}</td>
                   <td className="py-2 pr-3">
-                    {int(lap.total_ascent_m)} / {int(lap.total_descent_m)}
+                    {formatElevation(lap.total_ascent_m, units)} / {formatElevation(lap.total_descent_m, units)}
                   </td>
                   <td className="py-2 pr-3">{num(lap.avg_grade_pct, 1)}%</td>
                   <td className="py-2 pr-3">{num(lap.hr_drift_pct, 1)}%</td>

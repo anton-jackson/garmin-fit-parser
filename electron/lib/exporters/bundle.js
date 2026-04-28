@@ -25,7 +25,8 @@ export async function writeBundle(analysis, basePath, options) {
     binMode = 'time',
     binSize = null,
     includeGrade = false,
-    includeRawRecordsInJson = false
+    includeRawRecordsInJson = false,
+    units = 'imperial'
   } = options;
 
   const dir = dirname(basePath);
@@ -44,7 +45,8 @@ export async function writeBundle(analysis, basePath, options) {
     const md = buildMarkdown(analysis, {
       selectedLapIndices: lapSet,
       sourceFile: stem,
-      lapSeriesByIndex
+      lapSeriesByIndex,
+      units
     });
     const p = `${stub}.md`;
     await writeFile(p, md, 'utf8');
@@ -55,7 +57,8 @@ export async function writeBundle(analysis, basePath, options) {
     const json = buildJSON(analysis, {
       selectedLapIndices: lapSet,
       includeRecords: includeRawRecordsInJson,
-      lapSeriesByIndex
+      lapSeriesByIndex,
+      units
     });
     const p = `${stub}.json`;
     await writeFile(p, json, 'utf8');
@@ -63,7 +66,7 @@ export async function writeBundle(analysis, basePath, options) {
   }
 
   if (formats.csv) {
-    const csv = buildRecordsCsv(analysis, { selectedLapIndices: lapSet, includeGrade });
+    const csv = buildRecordsCsv(analysis, { selectedLapIndices: lapSet, includeGrade, units });
     const p = `${stub}.csv`;
     await writeFile(p, csv, 'utf8');
     written.push(p);
