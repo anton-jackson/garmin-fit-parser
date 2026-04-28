@@ -4,7 +4,7 @@
 // includeRecords: true to embed them.
 
 export function buildJSON(analysis, { selectedLapIndices, includeRecords = false, lapSeriesByIndex, units = 'metric' }) {
-  const { activity, session, laps } = analysis;
+  const { activity, session, laps, profile, profile_flags } = analysis;
 
   const lapsOut = laps
     .filter((l) => selectedLapIndices.has(l.lap_index))
@@ -31,10 +31,13 @@ export function buildJSON(analysis, { selectedLapIndices, includeRecords = false
       pa_hr_decoupling_pct: l.pa_hr_decoupling_pct ?? null,
       efficiency_factor_first_half: l.efficiency_factor_first_half ?? null,
       efficiency_factor_second_half: l.efficiency_factor_second_half ?? null,
+      moving_pct: l.moving_pct ?? null,
       series: lapSeriesByIndex.get(l.lap_index) ?? null
     }));
 
   const out = {
+    profile: profile ?? 'default',
+    profile_flags: profile_flags ?? null,
     units: {
       // Underlying numeric values are always SI (meters, m/s, seconds-per-km).
       // The `display` field hints which units the markdown was rendered in.
@@ -66,7 +69,11 @@ export function buildJSON(analysis, { selectedLapIndices, includeRecords = false
           total_descent_m: session.total_descent_m ?? null,
           vertical_per_km_m: session.vertical_per_km_m ?? null,
           training_stress_score: session.training_stress_score ?? null,
-          total_calories: session.total_calories ?? null
+          total_calories: session.total_calories ?? null,
+          moving_pct: session.moving_pct ?? null,
+          gps_pct: session.gps_pct ?? null,
+          record_count: session.record_count ?? null,
+          lap_count: session.lap_count ?? null
         }
       : null,
     laps: lapsOut

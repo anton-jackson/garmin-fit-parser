@@ -1,21 +1,20 @@
 import { parseRaw, buildStructured } from './parse.js';
 import { annotateRecords, annotateLaps, annotateSession } from './derive.js';
 import { binAllLaps } from './bin.js';
+import { resolveProfile, profileFlags } from './sportProfile.js';
 
 /**
  * Parse a FIT buffer and return a fully analyzed structure:
- *   { activity, session, laps[], records[], lapSeries[] }
+ *   { activity, session, laps[], records[], lapSeries[], profile, profileFlags }
  *
  * Each record carries lap_index, pace_s_per_km, grade_pct, grade_pct_smoothed,
- * gap_s_per_km. Each lap carries derived totals (ascent/descent/grade, pace,
- * vertical/km) and decoupling/drift metrics. lapSeries contains per-lap binned
- * mini-series for HR-vs-pace-over-time analysis.
+ * gap_s_per_km, is_moving. Each lap carries derived totals plus drift /
+ * decoupling computed from moving records only. The session block includes a
+ * data-quality summary (moving_pct, gps_pct).
  *
- * @param {Buffer} buffer
- * @param {Object} opts
- * @param {number} [opts.smoothHalfWindowSec=15]   ±window for grade smoothing (30s total)
- * @param {'time'|'distance'} [opts.binMode='time']
- * @param {number|null} [opts.binSize=null]        seconds (time mode) or meters (distance); null = smart default
+ * The `profile` field names the sport profile (running / hiking / ski_touring
+ * / alpine_skiing / cycling / default). Exporters use `profileFlags` to decide
+ * which derived metrics make sense to surface.
  */
 export async function analyzeFITFile(buffer, opts = {}) {
   const {
@@ -32,16 +31,24 @@ export async function analyzeFITFile(buffer, opts = {}) {
   const session = annotateSession(structured.session, laps, records);
   const lapSeries = binAllLaps(laps, records, { mode: binMode, binSize });
 
+  const profile = resolveProfile(
+    session?.sport ?? structured.activity?.sport ?? null,
+    session?.sub_sport ?? structured.activity?.sub_sport ?? null
+  );
+
   return {
     activity: structured.activity,
     session,
     sessions: structured.sessions,
     laps,
     records,
-    lapSeries
+    lapSeries,
+    profile,
+    profile_flags: profileFlags(profile)
   };
 }
 
 export { parseRaw, buildStructured } from './parse.js';
 export { annotateRecords, annotateLaps, annotateSession, gradeAdjustPace } from './derive.js';
 export { binLap, binAllLaps, defaultBinSeconds } from './bin.js';
+export { resolveProfile, profileFlags } from './sportProfile.js';

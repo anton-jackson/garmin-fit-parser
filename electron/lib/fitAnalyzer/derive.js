@@ -17,6 +17,11 @@ function minettiCost(g) {
 // outside the calibrated range.
 const MINETTI_GRADE_LIMIT = 0.25;
 
+// Speed threshold for "is moving" classification (m/s).
+// 0.5 m/s ≈ 1.8 km/h ≈ a slow walk; below this, GPS noise dominates and
+// derived per-record metrics (pace, drift) become unreliable.
+const MOVING_MIN_SPEED_MS = 0.5;
+
 // Grade-adjusted pace: equivalent flat pace (s/km) for the same metabolic cost.
 // gap = pace * (cost_flat / cost_grade)
 export function gradeAdjustPace(paceSPerKm, gradeDecimal) {
@@ -43,7 +48,7 @@ export function paceSPerKmFromSpeed(speedMs) {
   return 1000 / speedMs;
 }
 
-// Compute per-record grade (smoothed) and pace/GAP.
+// Compute per-record grade (smoothed), pace, GAP, and is_moving flag.
 // Smoothing: symmetric window of ±halfWindowSec on timestamps; grade derived
 // from cumulative altitude/distance deltas across the window endpoints.
 export function annotateRecords(records, { halfWindowSec = 15 } = {}) {
@@ -67,6 +72,7 @@ export function annotateRecords(records, { halfWindowSec = 15 } = {}) {
     const t = ts[i];
     const speed = speedField(rec);
     const pace = paceSPerKmFromSpeed(speed);
+    const isMoving = speed != null && speed >= MOVING_MIN_SPEED_MS;
 
     let gradeRaw = null;
     let gradeSmoothed = null;
@@ -97,7 +103,8 @@ export function annotateRecords(records, { halfWindowSec = 15 } = {}) {
       pace_s_per_km: pace,
       grade_pct: gradeRaw != null ? gradeRaw * 100 : null,
       grade_pct_smoothed: gradeSmoothed != null ? gradeSmoothed * 100 : null,
-      gap_s_per_km: gap
+      gap_s_per_km: gap,
+      is_moving: isMoving
     };
   });
 }
@@ -158,16 +165,20 @@ function deriveLapMetrics(lap, lapRecords) {
       ? ((ascent - descent) / distM) * 100
       : null;
 
-  // Decoupling / drift over the lap, split into halves by record count
+  // Drift / decoupling / EF over the lap, split into halves. Use moving
+  // records only — stationary time (chairlift, lunch, transitions) makes
+  // the halves comparison meaningless on multi-modal activities.
   let hrDriftPct = null;
   let paHrDecouplingPct = null;
   let efFirst = null;
   let efSecond = null;
 
-  if (!lapTooShort && lapRecords.length >= 4) {
-    const mid = Math.floor(lapRecords.length / 2);
-    const first = lapRecords.slice(0, mid);
-    const second = lapRecords.slice(mid);
+  const movingRecords = lapRecords.filter((r) => r.is_moving);
+
+  if (!lapTooShort && movingRecords.length >= 4) {
+    const mid = Math.floor(movingRecords.length / 2);
+    const first = movingRecords.slice(0, mid);
+    const second = movingRecords.slice(mid);
 
     const hr1 = avg(first.map((r) => r.heart_rate));
     const hr2 = avg(second.map((r) => r.heart_rate));
@@ -184,6 +195,10 @@ function deriveLapMetrics(lap, lapRecords) {
     }
   }
 
+  const movingCount = movingRecords.length;
+  const totalCount = lapRecords.length;
+  const movingPct = totalCount > 0 ? (movingCount / totalCount) * 100 : null;
+
   return {
     avg_pace_s_per_km: avgPace,
     total_ascent_m: ascent,
@@ -194,7 +209,8 @@ function deriveLapMetrics(lap, lapRecords) {
     pa_hr_decoupling_pct: paHrDecouplingPct,
     efficiency_factor_first_half: efFirst,
     efficiency_factor_second_half: efSecond,
-    too_short_for_derived: lapTooShort
+    too_short_for_derived: lapTooShort,
+    moving_pct: movingPct
   };
 }
 
@@ -232,13 +248,20 @@ export function annotateSession(session, laps, records) {
   }
   const verticalPerKm = distM && ascent != null ? (ascent / distM) * 1000 : null;
 
+  // Data quality: % of records moving, % with GPS
+  const totalRecs = records.length;
+  const movingRecs = records.filter((r) => r.is_moving).length;
+  const gpsRecs = records.filter((r) => r.position_lat != null && r.position_long != null).length;
+
   return {
     ...session,
     avg_pace_s_per_km: avgPace,
     total_ascent_m: ascent,
     total_descent_m: descent,
     vertical_per_km_m: verticalPerKm,
-    record_count: records.length,
-    lap_count: laps.length
+    record_count: totalRecs,
+    lap_count: laps.length,
+    moving_pct: totalRecs > 0 ? (movingRecs / totalRecs) * 100 : null,
+    gps_pct: totalRecs > 0 ? (gpsRecs / totalRecs) * 100 : null
   };
 }
