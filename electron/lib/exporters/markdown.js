@@ -29,9 +29,23 @@ function pct(v, dp = 1) {
   return `${v.toFixed(dp)}%`;
 }
 
+// Render climbing metrics (VAM, ascent segments, grade buckets) when the
+// activity actually had meaningful climbing — flat track sessions stay clean,
+// hilly road runs / ski tours / hikes / bike rides all light up automatically.
+const CLIMB_TOTAL_ASCENT_M = 100;     // ~330 ft total
+const CLIMB_VERT_PER_KM_M = 30;       // ~50 ft/mi
+
+function hadMeaningfulClimbing(session) {
+  if (!session) return false;
+  const ascent = session.total_ascent_m ?? session.total_ascent ?? 0;
+  const vpk = session.vertical_per_km_m ?? 0;
+  return ascent >= CLIMB_TOTAL_ASCENT_M || vpk >= CLIMB_VERT_PER_KM_M;
+}
+
 export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSeriesByIndex, units = 'imperial' }) {
   const { activity, session, laps, profile, profile_flags, ascent_segments, grade_buckets } = analysis;
   const flags = profile_flags ?? { drift: true, decoupling: true, gap: true, pace_primary: true };
+  const climby = hadMeaningfulClimbing(session);
   const distUnit = distanceLabel(units);
   const elevUnit = elevationLabel(units);
 
@@ -55,7 +69,7 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
   if (flags.pace_primary) {
     summaryLines.push(`**Avg pace:** ${formatPace(session?.avg_pace_s_per_km, units)}`);
   }
-  if (flags.vam && session?.vam_m_per_h) {
+  if (climby && session?.vam_m_per_h) {
     summaryLines.push(`**VAM:** ${formatVAM(session.vam_m_per_h, units)}`);
   }
   if (session?.avg_power) summaryLines.push(`**Avg power:** ${int(session.avg_power)} W`);
@@ -69,11 +83,11 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
 
   const lapsToShow = laps.filter((l) => selectedLapIndices.has(l.lap_index));
 
-  // Column visibility driven by profile flags.
+  // Column visibility — pace/drift/decoupling are sport-driven; VAM is data-driven.
   const showPace = flags.pace_primary;
   const showDrift = flags.drift;
   const showDecoupling = flags.decoupling;
-  const showVAM = flags.vam;
+  const showVAM = climby;
 
   const headerCols = ['#', 'Type', 'Time', `Dist (${distUnit})`];
   if (showPace) headerCols.push('Pace');
@@ -200,7 +214,7 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
     ''
   ];
 
-  if (flags.ascent_segments && ascent_segments && ascent_segments.length > 0) {
+  if (climby && ascent_segments && ascent_segments.length > 0) {
     sections.push('## Ascent segments', '');
     sections.push(
       `| # | Start | Duration | Ascent (${elevUnit}) | Dist (${distUnit}) | Avg grade | VAM | Avg HR | Max HR |`,
@@ -212,9 +226,14 @@ export function buildMarkdown(analysis, { selectedLapIndices, sourceFile, lapSer
     );
   }
 
-  if (flags.grade_buckets && grade_buckets && grade_buckets.length > 0) {
+  if (climby && grade_buckets && grade_buckets.length > 0) {
+    // Skip the section entirely if essentially all the time was within
+    // ±5% grade (a flat workout that happens to roll on small bumps).
+    const total = grade_buckets.reduce((s, b) => s + (b.record_count ?? 0), 0);
+    const flat = grade_buckets.find((b) => b.grade_band === '-5..5');
+    const flatPct = total > 0 ? ((flat?.record_count ?? 0) / total) * 100 : 100;
     const nonzero = grade_buckets.filter((b) => (b.record_count ?? 0) > 0);
-    if (nonzero.length > 0) {
+    if (nonzero.length > 1 && flatPct < 90) {
       sections.push('## Time at grade', '');
       sections.push(
         `| Grade band | Time | Avg HR |`,

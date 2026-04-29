@@ -38,8 +38,10 @@ export async function analyzeFITFile(buffer, opts = {}) {
   );
   const flags = profileFlags(profile);
 
-  const ascentSegments = flags.ascent_segments ? detectAscentSegments(records) : [];
-  const gradeBuckets = flags.grade_buckets ? gradeBucketHistogram(records) : [];
+  // Climbing metrics are always computed; markdown decides whether to render
+  // them based on the activity's actual climbing volume, not sport.
+  const ascentSegments = detectAscentSegments(records);
+  const gradeBuckets = gradeBucketHistogram(records);
 
   return {
     activity: structured.activity,
