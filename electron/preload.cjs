@@ -10,7 +10,8 @@ try {
   contextBridge.exposeInMainWorld('electronAPI', {
     selectFile: () => ipcRenderer.invoke('select-file'),
     parseFile: (filePath) => ipcRenderer.invoke('parse-file', filePath),
-    exportCSV: (records, selectedFields, suggestedName) => ipcRenderer.invoke('export-csv', records, selectedFields, suggestedName)
+    exportCSV: (records, selectedFields, suggestedName) => ipcRenderer.invoke('export-csv', records, selectedFields, suggestedName),
+    exportBundle: (analysis, options, suggestedName) => ipcRenderer.invoke('export-bundle', analysis, options, suggestedName)
   });
   
   console.log('[PRELOAD] ✓ electronAPI exposed to window');

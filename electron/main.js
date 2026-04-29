@@ -3,44 +3,17 @@ import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { createConnection } from 'net';
 import { parseFITFile } from './lib/fitParser.js';
 import { exportToCSV } from './lib/csvExporter.js';
+import { writeBundle } from './lib/exporters/bundle.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 let mainWindow;
 
-// Helper function to check if a port is available (server is running)
-function isPortOpen(port) {
-  return new Promise((resolve) => {
-    const socket = createConnection({ port, host: 'localhost' }, () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.on('error', () => resolve(false));
-    socket.setTimeout(100, () => {
-      socket.destroy();
-      resolve(false);
-    });
-  });
-}
-
-// Find the Vite dev server port
-async function findVitePort() {
-  // Try common Vite ports
-  const ports = [5173, 5174, 5175, 5176, 5177];
-  for (const port of ports) {
-    if (await isPortOpen(port)) {
-      console.log(`Found Vite server on port ${port}`);
-      return port;
-    }
-  }
-  // Default to 5173 if none found
-  console.warn('Could not find Vite server, defaulting to port 5173');
-  return 5173;
-}
+// Vite dev server is locked to this port via vite.config.js (strictPort: true).
+const VITE_DEV_PORT = 5180;
 
 async function createWindow() {
   // Use absolute path for preload script (must be .cjs for CommonJS)
@@ -84,11 +57,9 @@ async function createWindow() {
   console.log('isDevelopment:', isDevelopment);
   
   if (isDevelopment) {
-    // Find the actual Vite dev server port
-    const vitePort = await findVitePort();
-    const viteUrl = `http://localhost:${vitePort}`;
+    const viteUrl = `http://127.0.0.1:${VITE_DEV_PORT}`;
     console.log(`Loading Vite dev server: ${viteUrl}`);
-    
+
     mainWindow.loadURL(viteUrl);
     mainWindow.webContents.openDevTools();
     
@@ -193,5 +164,25 @@ ipcMain.handle('export-csv', async (event, records, selectedFields, suggestedNam
       success: false,
       error: error.message
     };
+  }
+});
+
+// Handle bundle export (markdown / json / csv to chosen base path)
+ipcMain.handle('export-bundle', async (event, analysis, options, suggestedName) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: suggestedName || 'activity',
+      filters: [{ name: 'Export', extensions: ['md', 'json', 'csv', '*'] }],
+      properties: ['showOverwriteConfirmation']
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    const written = await writeBundle(analysis, result.filePath, options);
+    return { success: true, written };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 });
